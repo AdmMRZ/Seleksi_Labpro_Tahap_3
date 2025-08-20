@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Browse Courses{% endblock %}
+
+{% block content %}
+<h1>Daftar Course</h1>
+
+{% if not course_entries %}
+<p>Belum ada course yang tersedia.</p>
+{% else %}
+<table>
+  <tr>
+    <th>Title</th>
+    <th>Description</th>
+    <th>Instructor</th>
+    <th>Topics</th>
+    <th>Price</th>
+    <th>Thumbnail</th>
+  </tr>
+
+  {% for course in course_entries %}
+  <tr>
+    <td>{{ course.title }}</td>
+    <td>{{ course.description }}</td>
+    <td>{{ course.instructor }}</td>
+    <td>{{ course.topics }}</td>
+    <td>${{ course.price }}</td>
+    <td>
+      {% if course.thumbnail_image %}
+        <img src="{{ course.thumbnail_image.url }}" alt="Thumbnail" width="100">
+      {% else %}
+        No image
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock content %}

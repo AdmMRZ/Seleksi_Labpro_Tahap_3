@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<h2>Register</h2>
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+<form method="POST">
+    {% csrf_token %}
+    <input type="text" name="username" placeholder="Username" required>
+    <input type="email" name="email" placeholder="Email" required>
+    <input type="text" name="first_name" placeholder="Nama Depan" required>
+    <input type="text" name="last_name" placeholder="Nama Belakang" required>
+    <input type="password" name="password" placeholder="Password" required>
+    <input type="password" name="confirm_password" placeholder="Konfirmasi Password" required>
+    <button type="submit">Register</button>
+</form>
+{% endblock content %}
