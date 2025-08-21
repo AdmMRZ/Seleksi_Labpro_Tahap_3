@@ -19,6 +19,14 @@ class CourseEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+class CoursePurchase(models.Model):
+    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE)
+    course = models.ForeignKey('CourseEntry', on_delete=models.CASCADE)
+    purchased_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'course')
+
 class ModuleEntry(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     course = models.ForeignKey(CourseEntry, on_delete=models.CASCADE, related_name='modules')
@@ -29,3 +37,12 @@ class ModuleEntry(models.Model):
     order = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+class ModuleProgress(models.Model):
+    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE)
+    module = models.ForeignKey('ModuleEntry', on_delete=models.CASCADE)
+    is_completed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('user', 'module')
+
