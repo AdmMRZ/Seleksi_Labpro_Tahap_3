@@ -1,7 +1,6 @@
 from django.urls import path
 from main.views import (
     show_xml, show_json,
-    show_courses, 
     api_register, api_login, api_self,
     api_courses, api_course_detail,
     api_course_modules, api_module_detail,
@@ -14,8 +13,6 @@ from main.views import (
 app_name = 'main'
 
 urlpatterns = [
-    path('', show_courses, name='home'),
-    path('courses/', show_courses, name='courses'),
     path('xml/', show_xml, name='show_xml'),
     path('json/', show_json, name='show_json'),
     path('api/auth/register', api_register, name='api_register'),
