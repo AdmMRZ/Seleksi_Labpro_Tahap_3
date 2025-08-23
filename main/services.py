@@ -108,8 +108,8 @@ class UserService:
         return UserRepository.get_by_id(uid)
 
     @staticmethod
-    def get_user_by_username_or_email(identifier: str):
-        return UserRepository.get_by_username_or_email(identifier)
+    def get_user_by_username_or_email(username_or_email: str):
+        return UserRepository.get_by_username_or_email(username_or_email)
 
     @staticmethod
     def create_user(data):

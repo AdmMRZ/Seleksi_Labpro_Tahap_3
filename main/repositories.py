@@ -100,8 +100,8 @@ class UserRepository:
         return CustomUser.objects.filter(id=user_id).first()
 
     @staticmethod
-    def get_by_username_or_email(identifier: str) -> Optional[CustomUser]:
-        return CustomUser.objects.filter(Q(username=identifier) | Q(email=identifier)).first()
+    def get_by_username_or_email(username_or_email: str) -> Optional[CustomUser]:
+        return CustomUser.objects.filter(Q(username=username_or_email) | Q(email=username_or_email)).first()
 
     @staticmethod
     def create_user(data: Dict[str, Any]) -> CustomUser:

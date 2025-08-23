@@ -1,11 +1,9 @@
-from django.http import HttpResponse, JsonResponse
-from django.core import serializers
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import datetime, jwt, json
-
-from main.models import CourseEntry, CoursePurchase
 from main.services import CourseService, ModuleService, PurchaseService, UserService
+from main.factories import EntityFactory
 
 SECRET_KEY = settings.SECRET_KEY
 
@@ -34,33 +32,19 @@ def get_user_from_token(request):
 def api_register(request):
     if request.method != 'POST':
         return _method_not_allowed()
-
     try:
         body = json.loads(request.body)
-        required = ['first_name', 'last_name', 'username', 'email', 'password', 'confirm_password']
+        user_data = EntityFactory.build_user_create(body)
 
-        if not all(body.get(k) for k in required):
-            return JsonResponse({'status': 'error', 'message': 'All fields are required', 'data': None}, status=400)
-
-        if body['password'] != body['confirm_password']:
-            return JsonResponse({'status': 'error', 'message': 'Password and confirm password do not match', 'data': None}, status=400)
-
-        if UserService.get_user_by_username_or_email(body['username']) or UserService.get_user_by_username_or_email(body['email']):
+        if UserService.get_user_by_username_or_email(user_data['username']) or \
+           UserService.get_user_by_username_or_email(user_data['email']):
             return JsonResponse({'status': 'error', 'message': 'Username or email already used', 'data': None}, status=400)
 
-        password = body['password']
+        password = user_data['password']
         if len(password) < 8 or password.isalpha() or password.isnumeric():
             return JsonResponse({'status': 'error', 'message': 'Password must be at least 8 chars and contain letters and numbers', 'data': None}, status=400)
 
-        user = UserService.create_user({
-            'username': body['username'],
-            'email': body['email'],
-            'first_name': body['first_name'],
-            'last_name': body['last_name'],
-            'password': password,
-            'balance': 0,
-            'is_administrator': False
-        })
+        user = UserService.create_user(user_data)
         return JsonResponse({
             'status': 'success',
             'message': 'Register successful',
@@ -71,25 +55,24 @@ def api_register(request):
                 'last_name': user.last_name
             }
         })
-
+    except ValueError as ve:
+        return JsonResponse({'status': 'error', 'message': str(ve), 'data': None}, status=400)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=500)
-
+ 
 
 @csrf_exempt
 def api_login(request):
     if request.method != 'POST':
         return _method_not_allowed()
-
     try:
         body = json.loads(request.body)
-        username_or_email = body.get('username_or_email')
+        identifier = body.get('username_or_email')
         password = body.get('password')
-
-        if not username_or_email or not password:
+        if not password:
             return JsonResponse({'status': 'error', 'message': 'Missing credentials', 'data': None}, status=400)
 
-        user = UserService.get_user_by_username_or_email(username_or_email)
+        user = UserService.get_user_by_username_or_email(identifier) or UserService.get_user_by_id(identifier)
         if user is None or not user.check_password(password):
             return JsonResponse({'status': 'error', 'message': 'Invalid username/email or password', 'data': None}, status=401)
 
@@ -101,16 +84,9 @@ def api_login(request):
             'iat': datetime.datetime.utcnow()
         }
         token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Login successful',
-            'data': {
-                'username': user.username,
-                'token': token
-            }
-        })
-
+        return JsonResponse({'status': 'success', 'message': 'Login successful', 'data': {'username': user.username, 'token': token}})
+    except ValueError as ve:
+        return JsonResponse({'status': 'error', 'message': str(ve), 'data': None}, status=400)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=500)
 
@@ -177,16 +153,8 @@ def api_courses(request):
 
         try:
             body = json.loads(request.body)
-            data = {
-                'title': body.get('title'),
-                'description': body.get('description'),
-                'instructor': body.get('instructor'),
-                'topics': body.get('topics', []),
-                'price': body.get('price'),
-                'thumbnail_image': body.get('thumbnail_image')
-            }
+            data = EntityFactory.build_course_create(body)
             course = CourseService.create_course(data)
-
             return JsonResponse({
                 "status": "success",
                 "message": "Course created",
@@ -202,7 +170,8 @@ def api_courses(request):
                     "updated_at": course.updated_at.isoformat() if hasattr(course, 'updated_at') else None
                 }
             })
-
+        except ValueError as ve:
+            return JsonResponse({'status': 'error', 'message': str(ve), 'data': None}, status=400)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=400)
 
@@ -238,16 +207,8 @@ def api_course_detail(request, course_id):
 
         try:
             body = json.loads(request.body)
-            data = {
-                'title': body.get('title', course.title),
-                'description': body.get('description', course.description),
-                'instructor': body.get('instructor', course.instructor),
-                'topics': body.get('topics', course.topics),
-                'price': body.get('price', course.price),
-                'thumbnail_image': body.get('thumbnail_image', course.thumbnail_image)
-            }
+            data = EntityFactory.build_course_update(course, body)
             course = CourseService.update_course(course, data)
-
             return JsonResponse({"status": "success", "message": "Course updated", "data": {
                 "id": str(course.id),
                 "title": course.title,
@@ -259,7 +220,10 @@ def api_course_detail(request, course_id):
                 "created_at": course.created_at.isoformat() if hasattr(course, 'created_at') else None,
                 "updated_at": course.updated_at.isoformat() if hasattr(course, 'updated_at') else None
             }})
-
+        
+        except ValueError as ve:
+            return JsonResponse({'status': 'error', 'message': str(ve), 'data': None}, status=400)
+        
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=400)
 
@@ -315,15 +279,8 @@ def api_course_modules(request, course_id):
 
         try:
             body = json.loads(request.body)
-            mdata = {
-                'title': body.get('title'),
-                'description': body.get('description'),
-                'order': int(body.get('order', 1)),
-                'pdf_content': body.get('pdf_content'),
-                'video_content': body.get('video_content')
-            }
+            mdata = EntityFactory.build_module_create(body)
             module = ModuleService.create_module(course, mdata)
-
             return JsonResponse({"status": "success", "message": "Module created", "data": {
                 "id": str(module.id),
                 "course_id": str(course.id),
@@ -335,7 +292,10 @@ def api_course_modules(request, course_id):
                 "created_at": module.created_at.isoformat() if hasattr(module, 'created_at') else None,
                 "updated_at": module.updated_at.isoformat() if hasattr(module, 'updated_at') else None
             }})
-
+        
+        except ValueError as ve:
+            return JsonResponse({'status': 'error', 'message': str(ve), 'data': None}, status=400)
+        
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=400)
 
@@ -373,15 +333,8 @@ def api_module_detail(request, module_id):
 
         try:
             body = json.loads(request.body)
-            data = {
-                'title': body.get('title', module.title),
-                'description': body.get('description', module.description),
-                'order': int(body.get('order', module.order)),
-                'pdf_content': body.get('pdf_content', module.pdf_content),
-                'video_content': body.get('video_content', module.video_content)
-            }
+            data = EntityFactory.build_module_update(module, body)
             module = ModuleService.update_module(module, data)
-
             return JsonResponse({"status": "success", "message": "Module updated", "data": {
                 "id": str(module.id),
                 "course_id": str(module.course.id),
@@ -393,7 +346,10 @@ def api_module_detail(request, module_id):
                 "created_at": module.created_at.isoformat() if hasattr(module, 'created_at') else None,
                 "updated_at": module.updated_at.isoformat() if hasattr(module, 'updated_at') else None
             }})
-
+        
+        except ValueError as ve:
+            return JsonResponse({'status': 'error', 'message': str(ve), 'data': None}, status=400)
+        
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=400)
 
@@ -411,7 +367,9 @@ def api_module_detail(request, module_id):
 @csrf_exempt
 def api_module_complete(request, module_id):
     user = get_user_from_token(request)
-
+    if (request.method != 'PATCH'):
+        return _method_not_allowed()
+    
     if not user:
         return _unauthorized()
 
@@ -451,7 +409,46 @@ def api_module_reorder(request, course_id):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=400)
+    
+@csrf_exempt
+def api_buy_course(request, course_id):
+    user = get_user_from_token(request)
 
+    if not user:
+        return _unauthorized()
+
+    if request.method != 'POST':
+        return _method_not_allowed()
+
+    course = CourseService.get_course(course_id)
+    if not course:
+        return JsonResponse({'status': 'error', 'message': 'Course not found', 'data': None}, status=404)
+
+    try:
+        result = PurchaseService.purchase_course(user, course)
+
+        ok = True
+        err = None
+        purchase = None
+        if isinstance(result, tuple):
+            ok, err, purchase = result
+        else:
+            purchase = result
+
+        if not ok:
+            return JsonResponse({'status': 'error', 'message': err or 'Purchase failed', 'data': None}, status=400)
+
+        if not purchase:
+            return JsonResponse({'status': 'error', 'message': 'Purchase not created', 'data': None}, status=500)
+
+        return JsonResponse({"status": "success", "message": "Course purchased", "data": {
+            "course_id": str(course.id),
+            "user_balance": getattr(user, 'balance', None),
+            "transaction_id": str(getattr(purchase, 'id', ''))
+        }})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e), 'data': None}, status=500)
 
 @csrf_exempt
 def api_my_courses(request):
@@ -531,7 +528,7 @@ def api_user_detail(request, user_id):
         return JsonResponse({'status': 'error', 'message': 'User not found', 'data': None}, status=404)
 
     if request.method == 'GET':
-        courses_purchased = CoursePurchase.objects.filter(user=target).count()
+        courses_purchased = PurchaseService.list_user_purchases(target, page=1, limit=100)[0]
         return JsonResponse({"status": "success", "message": "", "data": {
             "id": str(target.id),
             "username": target.username,
@@ -607,3 +604,4 @@ def api_user_balance(request, user_id):
 
     else:
         return _method_not_allowed()
+    
