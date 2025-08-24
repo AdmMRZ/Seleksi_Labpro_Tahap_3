@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - Gro Academy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-body p-5">
+                <h2 class="card-title text-center mb-4" style="color: var(--primary-color); font-weight: 600;">Login</h2>
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                <form method="POST" action="{% url 'main:login' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control rounded-3" placeholder="Enter username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" class="form-control rounded-3" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 rounded-3">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

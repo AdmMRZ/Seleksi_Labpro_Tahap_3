@@ -30,6 +30,22 @@ class CourseService:
     @staticmethod
     def delete_course(course):
         return CourseRepository.delete(course)
+    
+    def certificate_accessible(user, course) -> bool:
+        if not user.is_authenticated:
+            return False
+        modules = ModuleService.list_modules(course, page=1, limit=100)[0]
+        completed_modules = ModuleService.completed_modules_count(user, course)
+        return completed_modules == len(modules)
+    
+    def progress_percentage(user, course) -> int:
+        if not user.is_authenticated:
+            return 0
+        total = ModuleService.total_modules(course)
+        if total == 0:
+            return 0
+        done = ModuleService.completed_modules_count(user, course)
+        return int((done / total) * 100)
 
 
 class ModuleService:
@@ -77,7 +93,7 @@ class ModuleService:
 
     @staticmethod
     def total_modules(course):
-        return ModuleRepository.list_by_course(course, page=1, limit=1)[1]  # list_by_course returns (items, total)
+        return ModuleRepository.list_by_course(course, page=1, limit=1)[1]  
 
     @staticmethod
     def completed_modules_count(user, course):
@@ -100,6 +116,9 @@ class PurchaseService:
     @staticmethod
     def list_user_purchases(user, q: str = '', page: int = 1, limit: int = 15):
         return PurchaseRepository.list_user_purchases(user, q=q, page=page, limit=limit)
+    
+    def has_purchased(user, course) -> bool:
+        return PurchaseRepository.exists(user, course)
 
 
 class UserService:
@@ -110,6 +129,15 @@ class UserService:
     @staticmethod
     def get_user_by_username_or_email(username_or_email: str):
         return UserRepository.get_by_username_or_email(username_or_email)
+
+    def validate_registration(data):
+        if UserService.get_user_by_username_or_email(data['username']) or \
+           UserService.get_user_by_username_or_email(data['email']):
+            raise ValueError("Username or email already used")
+
+        password = data['password']
+        if len(password) < 8 or password.isalpha() or password.isnumeric():
+            raise ValueError("Password must be at least 8 chars and contain letters and numbers")
 
     @staticmethod
     def create_user(data):

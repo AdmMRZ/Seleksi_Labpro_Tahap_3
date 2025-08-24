@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign Up - Gro Academy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-body p-5">
+                <h2 class="card-title text-center mb-4" style="color: var(--primary-color); font-weight: 600;">Join Gro Academy</h2>
+                <p class="text-center text-muted mb-4">Learn new skills and grow your career</p>
+
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                {% if success %}
+                    <div class="alert alert-success">{{ success }}</div>
+                {% endif %}
+
+                <form method="POST" action="{% url 'main:register' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control rounded-3" placeholder="you@example.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control rounded-3" placeholder="Choose a username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">First Name</label>
+                        <input type="text" name="first_name" class="form-control rounded-3" placeholder="John" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" name="last_name" class="form-control rounded-3" placeholder="Doe" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" class="form-control rounded-3" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 rounded-3">Create Account</button>
+                </form>
+
+                <p class="text-center text-muted mt-4 mb-0">Already have an account? <a href="{% url 'main:login' %}" class="text-primary fw-semibold">Login</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

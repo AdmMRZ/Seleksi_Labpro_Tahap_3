@@ -1,6 +1,12 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.shortcuts import render, redirect
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
 import datetime, jwt, json
 from main.services import CourseService, ModuleService, PurchaseService, UserService
 from main.factories import EntityFactory
@@ -35,15 +41,7 @@ def api_register(request):
     try:
         body = json.loads(request.body)
         user_data = EntityFactory.build_user_create(body)
-
-        if UserService.get_user_by_username_or_email(user_data['username']) or \
-           UserService.get_user_by_username_or_email(user_data['email']):
-            return JsonResponse({'status': 'error', 'message': 'Username or email already used', 'data': None}, status=400)
-
-        password = user_data['password']
-        if len(password) < 8 or password.isalpha() or password.isnumeric():
-            return JsonResponse({'status': 'error', 'message': 'Password must be at least 8 chars and contain letters and numbers', 'data': None}, status=400)
-
+        UserService.validate_registration(user_data)
         user = UserService.create_user(user_data)
         return JsonResponse({
             'status': 'success',
@@ -67,7 +65,7 @@ def api_login(request):
         return _method_not_allowed()
     try:
         body = json.loads(request.body)
-        identifier = body.get('username_or_email')
+        identifier = body.get('identifier')
         password = body.get('password')
         if not password:
             return JsonResponse({'status': 'error', 'message': 'Missing credentials', 'data': None}, status=400)
@@ -605,3 +603,188 @@ def api_user_balance(request, user_id):
     else:
         return _method_not_allowed()
     
+def home_page(request):
+    search_query = request.GET.get('q', '')  
+    page_number = int(request.GET.get('page', 1))  
+    limit = int(request.GET.get('limit', 10)) 
+
+    limit = max(1, min(limit, 50))  
+    page_number = max(1, page_number) 
+
+    courses, total_items = CourseService.list_courses(q=search_query, page=page_number, limit=limit)
+
+    paginator = Paginator(courses, limit)
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'courses.html', {
+        'courses': page_obj.object_list,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'limit': limit,
+    })
+
+def register_page(request):
+    if request.method == 'GET':
+        return render(request, 'register.html')
+
+    elif request.method == 'POST':
+        try:
+            user_data = {
+                'username': request.POST.get('username'),
+                'email': request.POST.get('email'),
+                'password': request.POST.get('password'),
+                'first_name': request.POST.get('first_name', ''),
+                'last_name': request.POST.get('last_name', '')
+            }
+
+            UserService.validate_registration(user_data)
+            user = UserService.create_user(user_data)
+            login(request, user)
+            return redirect('/')
+        except ValueError as ve:
+            return render(request, 'register.html', {'error': str(ve)})
+        except Exception as e:
+            return render(request, 'register.html', {'error': str(e)})
+
+def login_page(request):
+    if request.method == 'GET':
+        return render(request, 'login.html')
+    elif request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = UserService.get_user_by_username_or_email(username)
+        if user and user.check_password(password):
+            login(request, user)
+            return redirect('/')
+        else:
+            return render(request, 'login.html', {'error': 'Invalid credentials'})
+
+def logout_page(request):
+    logout(request)
+    return redirect('/')
+
+@login_required
+def my_courses_page(request):
+    user = request.user
+    search_query = request.GET.get('q', '') 
+    page_number = int(request.GET.get('page', 1)) 
+    limit = int(request.GET.get('limit', 10))  
+
+    limit = max(1, min(limit, 50))  
+    page_number = max(1, page_number)
+
+    purchases = PurchaseService.list_user_purchases(user, q=search_query, page=page_number, limit=limit)
+    purchased_courses = [p.course for p in purchases[0]]
+
+    paginator = Paginator(purchased_courses, limit)
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'my_courses.html', {
+        'purchased_courses': page_obj.object_list,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'limit': limit,
+    })
+
+@login_required
+def profile_page(request):
+    user = request.user
+
+    user_data = {
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'balance': user.balance,
+    }
+
+    return render(request, 'profile.html', {'user_data': user_data})
+
+def course_detail_page(request, course_id):
+    user = request.user
+    course = CourseService.get_course(course_id)
+
+    already_purchased = PurchaseService.has_purchased(user, course) if user.is_authenticated else False
+    certificate_available = CourseService.certificate_accessible(user, course) if already_purchased else False
+
+    if request.method == 'POST':
+        success, error, _ = PurchaseService.purchase_course(user, course)
+        if not success:
+            return render(request, 'course_detail.html', {
+                'course': course,
+                'already_purchased': already_purchased,
+                'certificate_available': certificate_available,
+                'error': error
+            })
+
+        return render(request, 'course_detail.html', {
+            'course': course,
+            'already_purchased': True,
+            'certificate_available': certificate_available,
+            'success': 'Course purchased successfully!'
+        })
+
+    return render(request, 'course_detail.html', {
+        'course': course,
+        'already_purchased': already_purchased,
+        'certificate_available': certificate_available
+    })
+
+@login_required
+def course_modules_page(request, course_id):
+    user = request.user
+    course = CourseService.get_course(course_id)
+
+    if not course:
+        return render(request, '404.html', {'error': 'Course not found'}, status=404)
+
+    modules, total_items = ModuleService.list_modules(course, page=1, limit=100)
+
+    progress_percentage = CourseService.progress_percentage(user, course)
+    certificate_available = CourseService.certificate_accessible(user, course)
+
+    return render(request, 'courses_module.html', {
+        'course': course,
+        'modules': modules,
+        'progress_percentage': progress_percentage,
+        'certificate_available': certificate_available,
+    })
+
+@login_required
+def mark_module_complete(request, module_id):
+    user = request.user
+    module = ModuleService.get_module(module_id)
+
+    if not module:
+        return render(request, '404.html', {'error': 'Module not found'}, status=404)
+
+    if request.method == 'POST':
+        progress, certificate_url = ModuleService.mark_completed(user, module)
+        return redirect('main:course_modules', course_id=module.course.id)
+
+@login_required
+def download_certificate(request, course_id):
+    user = request.user
+    course = CourseService.get_course(course_id)
+
+    if not course:
+        return render(request, '404.html', {'error': 'Course not found'}, status=404)
+ 
+    modules, _ = ModuleService.list_modules(course, page=1, limit=100)
+    completed_modules = ModuleService.completed_modules_count(user, course)
+    if completed_modules != len(modules):
+        return render(request, '403.html', {'error': 'Certificate not available'}, status=403)
+ 
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{course.title}_certificate.pdf"'
+
+    p = canvas.Canvas(response)
+    p.drawString(100, 750, "Certificate of Completion")
+    p.drawString(100, 700, f"Presented to: {user.first_name} {user.last_name}")
+    p.drawString(100, 650, f"For completing the course: {course.title}")
+    p.drawString(100, 600, f"Instructor: {course.instructor}")
+    p.drawString(100, 550, f"Date: {datetime.date.today().strftime('%B %d, %Y')}")
+    p.showPage()
+    p.save()
+
+    return response

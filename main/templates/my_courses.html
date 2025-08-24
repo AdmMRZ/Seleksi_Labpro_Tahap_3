@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}My Courses - Gro Academy{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="text-center mb-4" style="color: var(--primary-color); font-weight: 600;">My Courses</h1>
+ 
+    <form method="GET" action="{% url 'main:my_courses' %}" class="mb-4">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Search courses..." value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+
+    {% if purchased_courses %}
+        <div class="row">
+            {% for course in purchased_courses %}
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm border-0 rounded-4">
+                        {% if course.thumbnail_image %}
+                            <img src="{{ course.thumbnail_image }}" class="card-img-top" alt="{{ course.title }}">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ course.title }}</h5>
+                            <p class="card-text text-muted">{{ course.description|truncatewords:20 }}</p>
+                            <p class="card-text"><strong>Instructor:</strong> {{ course.instructor }}</p>
+                            <p class="card-text"><strong>Price:</strong> IDR {{ course.price }}</p>
+                            <a href="/course/{{ course.id }}/" class="btn btn-primary">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div> 
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?q={{ search_query }}&limit={{ limit }}&page={{ page_obj.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+                        <a class="page-link" href="?q={{ search_query }}&limit={{ limit }}&page={{ num }}">{{ num }}</a>
+                    </li>
+                {% endfor %}
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?q={{ search_query }}&limit={{ limit }}&page={{ page_obj.next_page_number }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% else %}
+        <div class="alert alert-warning text-center">You have not purchased any courses yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

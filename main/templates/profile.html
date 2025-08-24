@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - Gro Academy{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-5 text-primary fw-bold">My Profile</h1>
+
+    <div class="card shadow-sm border-0 rounded-4 mx-auto" style="max-width: 600px;">
+        <div class="card-body text-center">
+            <h5 class="card-title mb-4 fw-semibold">User Information</h5>
+            <ul class="list-group list-group-flush text-start">
+                <li class="list-group-item d-flex justify-content-between">
+                    Username
+                    <span class="fw-bold">{{ user_data.username }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    Email
+                    <span class="fw-bold">{{ user_data.email }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    First Name
+                    <span class="fw-bold">{{ user_data.first_name }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    Last Name
+                    <span class="fw-bold">{{ user_data.last_name }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    Balance
+                    <span class="fw-bold">IDR {{ user_data.balance }}</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="mt-4 text-center">
+        <a href="{% url 'main:logout' %}" class="btn btn-danger btn-lg px-5">Logout</a>
+    </div>
+</div>
+{% endblock %}

@@ -20,11 +20,14 @@ def _paginate(qs: QuerySet, page: int, limit: int) -> Tuple[List[Any], int]:
 class CourseRepository:
     @staticmethod
     def list(q: str = '', page: int = 1, limit: int = 15) -> Tuple[List[CourseEntry], int]:
-        qs = CourseEntry.objects.filter(
-            Q(title__icontains=q) |
-            Q(instructor__icontains=q) |
-            Q(topics__icontains=q)
-        ).order_by('-created_at')
+        qs = CourseEntry.objects.all()  
+        if q:  
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(instructor__icontains=q) |
+                Q(topics__icontains=q)
+            )
+        qs = qs.order_by('-created_at')
         return _paginate(qs, page, limit)
 
     @staticmethod
